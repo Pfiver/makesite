@@ -26,14 +26,10 @@
 
 """Make static website/blog with Python."""
 
-
 import os
-import shutil
 import re
-import glob
+import shutil
 import sys
-import json
-import datetime
 
 
 def fread(filename):
@@ -57,138 +53,53 @@ def log(msg, *args):
     sys.stderr.write(msg.format(*args) + '\n')
 
 
-def truncate(text, words=25):
-    """Remove tags and truncate text to the specified number of words."""
-    return ' '.join(re.sub('(?s)<.*?>', ' ', text).split()[:words])
-
-
-def read_headers(text):
+def parse_headers(page_src, params):
     """Parse headers in text and yield (key, value, end-index) tuples."""
-    for match in re.finditer(r'\s*<!--\s*(.+?)\s*:\s*(.+?)\s*-->\s*|.+', text):
+    end = 0
+    for match in re.finditer(r'\s*<!--\s*(.+?)\s*:\s*(.+?)\s*-->\s*|.+', page_src):
         if not match.group(1):
             break
-        yield match.group(1), match.group(2), match.end()
+        params[match.group(1)] = match.group(2)
+        end = match.end()
+
+    return page_src[end:]
 
 
-def rfc_2822_format(date_str):
-    """Convert yyyy-mm-dd date string to RFC 2822 format date string."""
-    d = datetime.datetime.strptime(date_str, '%Y-%m-%d')
-    return d.strftime('%a, %d %b %Y %H:%M:%S +0000')
-
-
-def read_content(filename):
-    """Read content and metadata from file into a dictionary."""
-    # Read file content.
-    text = fread(filename)
-
-    # Read metadata and save it in a dictionary.
-    date_slug = os.path.basename(filename).split('.')[0]
-    match = re.search(r'^(?:(\d\d\d\d-\d\d-\d\d)-)?(.+)$', date_slug)
-    content = {
-        'date': match.group(1) or '1970-01-01',
-        'slug': match.group(2),
-    }
-
-    # Read headers.
-    end = 0
-    for key, val, end in read_headers(text):
-        content[key] = val
-
-    # Separate content from headers.
-    text = text[end:]
-
-    # Convert Markdown content to HTML.
-    if filename.endswith(('.md', '.mkd', '.mkdn', '.mdown', '.markdown')):
-        try:
-            import commonmark
-            text = commonmark.commonmark(text)
-        except ImportError as e:
-            log('WARNING: Cannot render Markdown in {}: {}', filename, str(e))
-
-    # Update the dictionary with content and RFC 2822 date.
-    content.update({
-        'content': text,
-        'rfc_2822_date': rfc_2822_format(content['date'])
-    })
-
-    return content
-
-
-def render(template, **params):
+def render(template, params):
     """Replace placeholders in template with values from params."""
     return re.sub(r'{{\s*([^}\s]+)\s*}}',
                   lambda match: str(params.get(match.group(1), match.group(0))),
                   template)
 
 
-def make_pages(src, dst, layout, **params):
+def make_page(src_path, dst_path, layout, params):
     """Generate pages from page content."""
-    items = []
+    log('Rendering {} => {} ...', src_path, dst_path)
 
-    for src_path in glob.glob(src):
-        content = read_content(src_path)
+    page_params = params | {
+        'name': os.path.basename(src_path).split('.')[0]
+    }
+    page_src = fread(src_path)
+    page_src = parse_headers(page_src, page_params)
+    content = render(page_src, page_params)
+    layout_params = page_params | {'content': content}
+    output = render(layout, layout_params)
 
-        page_params = dict(params, **content)
-
-        # Populate placeholders in content if content-rendering is enabled.
-        if page_params.get('render') == 'yes':
-            rendered_content = render(page_params['content'], **page_params)
-            page_params['content'] = rendered_content
-            content['content'] = rendered_content
-
-        items.append(content)
-
-        dst_path = render(dst, **page_params)
-        output = render(layout, **page_params)
-
-        log('Rendering {} => {} ...', src_path, dst_path)
-        fwrite(dst_path, output)
-
-    return sorted(items, key=lambda x: x['date'], reverse=True)
-
-
-def make_list(posts, dst, list_layout, item_layout, **params):
-    """Generate list page for a blog."""
-    items = []
-    for post in posts:
-        item_params = dict(params, **post)
-        item_params['summary'] = truncate(post['content'])
-        item = render(item_layout, **item_params)
-        items.append(item)
-
-    params['content'] = ''.join(items)
-    dst_path = render(dst, **params)
-    output = render(list_layout, **params)
-
-    log('Rendering list => {} ...', dst_path)
     fwrite(dst_path, output)
 
 
 def main():
-    # Create a new _site directory from scratch.
     if os.path.isdir('site'):
         shutil.rmtree('site')
 
-    # Default parameters.
-    params = {
-        'base_path': '',
-        'subtitle': 'Lorem Ipsum',
-        'author': 'Admin',
-        'site_url': 'http://localhost:8000',
-        'current_year': datetime.datetime.now().year
-    }
+    params = {}
 
-    # If params.json exists, load it.
-    if os.path.isfile('params.json'):
-        params.update(json.loads(fread('params.json')))
+    layout = fread('layout.html')
 
-    # Load layouts.
-    page_layout = fread('page.html')
+    make_page('index.html', 'site/index.html', layout, params)
+    make_page('contact.html', 'site/contact.html', layout, params)
+    make_page('about.html', 'site/about.html', layout, params)
 
-    # Create site pages.
-    make_pages('index.html', 'site/index.html', page_layout, **params)
-    make_pages('contact.md', 'site/contact.html', page_layout, **params)
-    make_pages('about.html', 'site/about.html', page_layout, **params)
     shutil.copy('style.css', 'site/style.css')
 
 
