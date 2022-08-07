@@ -44,7 +44,8 @@ nav {
     line-height: 3em;
 }
 
-nav a {
+nav a, nav span {
+    color: #cccccc;
     margin-right: 1em;
 }
 

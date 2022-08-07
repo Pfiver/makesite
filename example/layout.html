@@ -1,5 +1,5 @@
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="en">
 <head>
     <title>{{ page_title }}</title>
     <meta charset="UTF-8">
@@ -12,11 +12,23 @@
 <nav>
 <section>
     <span class="home">
-        <a href="index.html">Home</a>
+        {% if name == 'index' %}
+            <span>{{ site_title }}</span>
+        {% else %}
+            <a href="index.html">{{ site_title }}</a>
+        {% end %}
     </span>
     <span class="links">
-        <a href="contact.html">Contact</a>
-        <a href="about.html">About</a>
+        {% if name == 'galleries' %}
+            <span>Galleries</span>
+        {% else %}
+            <a href="galleries.html">Galleries</a>
+        {% end %}
+        {% if name == 'contact' %}
+            <span>Contact</span>
+        {% else %}
+            <a href="contact.html">Contact</a>
+        {% end %}
     </span>
 </section>
 </nav>

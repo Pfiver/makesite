@@ -1,0 +1,8 @@
+{
+  "sample": {
+    "title": "Sample Gallery",
+    "pics": [{
+      "name": "pic1"
+    }]
+  }
+}

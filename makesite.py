@@ -3,6 +3,7 @@
 # The MIT License (MIT)
 #
 # Copyright (c) 2018 Sunaina Pai
+# Copyright (c) 2022 Patrick Pfeifer
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -25,11 +26,13 @@
 
 
 """Make static website/blog with Python."""
-
+import json
 import os
 import re
 import shutil
 import sys
+
+import yaml
 
 
 def fread(filename):
@@ -56,20 +59,88 @@ def log(msg, *args):
 def parse_headers(page_src, params):
     """Parse headers in text and yield (key, value, end-index) tuples."""
     end = 0
-    for match in re.finditer(r'\s*<!--\s*(.+?)\s*:\s*(.+?)\s*-->\s*|.+', page_src):
-        if not match.group(1):
-            break
+    for match in re.finditer(r'\s*<!--\s*(.+?)\s*:\s*(.+?)\s*-->\s*', page_src):
         params[match.group(1)] = match.group(2)
         end = match.end()
 
     return page_src[end:]
 
 
-def render(template, params):
+def eval_dotted_expression(ctx, expr, default=None):
+    """
+    translate dot- to bracket-notation
+    e.g. site.items[0].name ==> site["items"][0]["name"]
+    """
+    expression = re.sub(r'\.(\w+)(?=[.\s\[\])]|$)', r'["\1"]', expr)
+    try:
+        return eval(expression, {}, ctx)
+    except KeyError:
+        return default
+
+
+def render_expressions(template, params):
     """Replace placeholders in template with values from params."""
-    return re.sub(r'{{\s*([^}\s]+)\s*}}',
-                  lambda match: str(params.get(match.group(1), match.group(0))),
-                  template)
+    def get_value(match):
+        return str(eval_dotted_expression(params, match.group(1), match.group(0)))
+    return re.sub(r'{{\s*([^}\s]+)\s*}}', get_value, template)
+
+
+def render(template, params):
+    """Process {% if ... %}, {% for ... %} and "bare" blocks."""
+    out = []
+    nesting = 0
+    block_start = 0
+    block_proc = None
+    post_start = 0
+    for match in re.finditer(r'{%\s*(if |else|for |end)(.+?)\s*%}', template):
+        if match.group(1) in ('if ', 'for '):
+            if nesting == 0:
+                # pre
+                out.append(render_expressions(template[post_start:match.start()], params))
+                block_proc = get_block_processor(*match.groups(), params)
+                block_start = match.end()
+            nesting += 1
+        if match.group(1) in ('else', ''):
+            if nesting == 1:
+                # block
+                block_template = template[block_start:match.start()]
+                block_proc(lambda block_params: out.append(render(block_template, block_params)))
+                block_proc.negate = True  # re-use the same processor with inverted logic
+                block_start = match.end()
+        if match.group(1) in ('end', ''):
+            nesting -= 1
+            if nesting == 0:
+                # block
+                block_template = template[block_start:match.start()]
+                block_proc(lambda block_params: out.append(render(block_template, block_params)))
+                post_start = match.end()
+    # post
+    out.append(render_expressions(template[post_start:], params))
+
+    return "".join(out)
+
+
+def get_block_processor(key, expr, params):
+    proc = None
+    if key == 'if ':
+        def proc(render_function):
+            if eval_dotted_expression(params, expr) ^ proc.negate:
+                render_function(params)
+        proc.negate = False
+    if key == 'for ':
+        names, expr = expr.split(" in ")
+        names = re.split(r',\s*', names)
+        if len(names) == 1:
+            def pack(elements):
+                return {names[0]: elements}
+        else:
+            def pack(elements):
+                return {name: elem for name, elem in zip(names, elements)}
+
+        def proc(render_function):
+            for elements in eval_dotted_expression(params, expr):
+                render_function(params | pack(elements))
+    return proc
 
 
 def make_page(src_path, dst_path, layout, params):
@@ -94,11 +165,16 @@ def main():
 
     params = {}
 
+    params.update(yaml.safe_load(fread('config.yaml')))
+    params.update({
+        'galleries': json.loads(fread('gallery-data.json'))
+    })
+
     layout = fread('layout.html')
 
     make_page('index.html', 'site/index.html', layout, params)
     make_page('contact.html', 'site/contact.html', layout, params)
-    make_page('about.html', 'site/about.html', layout, params)
+    make_page('galleries.html', 'site/galleries.html', layout, params)
 
     shutil.copy('style.css', 'site/style.css')
 

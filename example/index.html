@@ -1,14 +1,11 @@
 <!-- page_title: Lorem Ipsum -->
 <h1>Lorem Ipsum</h1>
-<p>
-Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nunc nibh
-tellus, vehicula ut maximus sed, fringilla a justo. Nunc vitae efficitur
-nisl. Ut sapien erat, pretium et commodo nec, rutrum bibendum magna. Sed
-ut massa massa. Etiam euismod neque lacus, id tincidunt risus iaculis a.
-Aliquam porta venenatis bibendum. Nam id varius nulla. Sed vitae purus
-ac odio ornare vestibulum vitae tempor arcu. Nunc non venenatis purus.
-Duis a augue at nulla congue egestas. Morbi mattis felis sit amet tortor
-euismod, fringilla viverra est elementum.
+{% if 1 == 1 %}<p>Math is correct.</p>{% end %}
+<ul>
+{% for val in {"attr": "one"}, {"attr": "two"}, {"attr": "three"} %}
+<li>Attr: {{ val.attr }}</li>
+{% end %}
+</ul>
 <p>
 Suspendisse vestibulum sed massa eu tincidunt. Pellentesque cursus, nisl
 at gravida suscipit, odio quam placerat mi, in iaculis nunc risus eu
