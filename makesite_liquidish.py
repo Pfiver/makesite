@@ -26,11 +26,13 @@
 
 
 """Make static website/blog with Python."""
+import glob
 import json
 import os
 import re
 import shutil
 import sys
+from os import path
 
 import yaml
 
@@ -59,7 +61,9 @@ def log(msg, *args):
 def parse_headers(page_src, params):
     """Parse headers in text and yield (key, value, end-index) tuples."""
     end = 0
-    for match in re.finditer(r'\s*<!--\s*(.+?)\s*:\s*(.+?)\s*-->\s*', page_src):
+    for match in re.finditer(r'\s*<!--\s*(.+?)\s*:\s*(.+?)\s*-->\s*|.+', page_src):
+        if not match.group(1):
+            break
         params[match.group(1)] = match.group(2)
         end = match.end()
 
@@ -143,40 +147,75 @@ def get_block_processor(key, expr, params):
     return proc
 
 
-def make_page(src_path, dst_path, layout, params):
+def get_lang(file):
+    return re.search(r'(?:_(\w\w))?.html', file).group(1) or ''
+
+
+def make_page(name, layout, params, lang=''):
     """Generate pages from page content."""
-    log('Rendering {} => {} ...', src_path, dst_path)
+    dst, src = get_src_dst(name, lang)
+    log('Rendering {} => {} ...', src, dst)
 
     page_params = params | {
-        'name': os.path.basename(src_path).split('.')[0]
+        'name': name,
+        'lang': lang,
+        'lang_names': {
+            'en': name,
+            'de': name + '_de'
+        }
     }
-    page_src = fread(src_path)
+
+    page_src = fread(src)
     page_src = parse_headers(page_src, page_params)
     content = render(page_src, page_params)
     layout_params = page_params | {'content': content}
     output = render(layout, layout_params)
 
-    fwrite(dst_path, output)
+    fwrite(dst, output)
+
+
+def get_src_dst(page_name, lang):
+    src = page_name
+    dst = 'site/' + page_name
+    if lang:
+        if not path.exists(src + '_' + lang + '.html'):
+            src += '.html'
+        else:
+            src += '_' + lang + '.html'
+        dst += '_' + lang + '.html'
+    else:
+        src += '.html'
+        dst += '.html'
+    return dst, src
 
 
 def main():
-    if os.path.isdir('site'):
-        shutil.rmtree('site')
-
     params = {}
 
-    params.update(yaml.safe_load(fread('config.yaml')))
-    params.update({
-        'galleries': json.loads(fread('gallery-data.json'))
-    })
+    params.update(yaml.safe_load(fread('config.yml')))
+    for gallery_data in (d + '/gallery-data.json' for d in ('.', 'site')):
+        if path.exists(gallery_data):
+            params.update({
+                'galleries': json.loads(fread(gallery_data))
+            })
 
-    layout = fread('layout.html')
+    layout_files = glob.glob("layout*.html")
 
-    make_page('index.html', 'site/index.html', layout, params)
-    make_page('contact.html', 'site/contact.html', layout, params)
-    make_page('galleries.html', 'site/galleries.html', layout, params)
+    page_names = [file[:-5] for file in glob.glob("*.html")
+                  if not get_lang(file) and not file.startswith("layout")]
 
-    shutil.copy('style.css', 'site/style.css')
+    for file in layout_files:
+        lang = get_lang(file)
+        layout_params = dict(params)
+        layout = parse_headers(fread(file), layout_params)
+        for name in page_names:
+            make_page(name, layout, layout_params, lang)
+
+    for f in 'assets logo.png favicon.ico style.css'.split(' '):
+        if path.isdir(f):
+            shutil.copytree(f, 'site/' + f, dirs_exist_ok=True)
+        elif path.exists(f):
+            shutil.copy(f, 'site/' + f)
 
 
 if __name__ == '__main__':
