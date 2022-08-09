@@ -192,7 +192,20 @@ def get_src_dst(page_name, lang):
 def main():
     params = {}
 
-    params.update(yaml.safe_load(fread('config.yml')))
+    try:
+        params.update(yaml.safe_load(fread('config.yml')))
+    except Exception:
+        reply = input("Config file not found. Do you want to create an example site ? [Y/n] ")
+        if reply and not reply.lower().startswith("y"):
+            return
+        from importlib import resources
+        shutil.copytree(resources.path('makesite_liquidish', 'example_site'), 'example_site')
+        print()
+        print("copied example site to 'example_site'.")
+        print("Now you can 'cd' into it and run 'makesite' again.")
+        print()
+        return
+
     for gallery_data in (d + '/gallery-data.json' for d in ('.', 'site')):
         if path.exists(gallery_data):
             params.update({
