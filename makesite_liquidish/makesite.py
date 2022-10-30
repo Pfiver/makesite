@@ -24,17 +24,19 @@
 # TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+"""Generate a static website with Python."""
 
-"""Make static website/blog with Python."""
-import glob
 import json
 import os
 import re
 import shutil
+import glob
 import sys
 from os import path
 
 import yaml
+
+site_dir = "_site"
 
 
 def fread(filename):
@@ -84,8 +86,10 @@ def eval_dotted_expression(ctx, expr, default=None):
 
 def render_expressions(template, params):
     """Replace placeholders in template with values from params."""
+
     def get_value(match):
         return str(eval_dotted_expression(params, match.group(1), match.group(0)))
+
     return re.sub(r'{{\s*([^}\s]+)\s*}}', get_value, template)
 
 
@@ -130,9 +134,10 @@ def get_block_processor(key, expr, params):
         def proc(render_function):
             if eval_dotted_expression(params, expr) ^ proc.negate:
                 render_function(params)
+
         proc.negate = False
     if key == 'for ':
-        names, expr = expr.split(" in ")
+        names, expr = expr.split(" in ", 1)
         names = re.split(r',\s*', names)
         if len(names) == 1:
             def pack(elements):
@@ -176,7 +181,7 @@ def make_page(name, layout, params, lang=''):
 
 def get_src_dst(page_name, lang):
     src = page_name
-    dst = 'site/' + page_name
+    dst = path.join(site_dir, page_name)
     if lang:
         if not path.exists(src + '_' + lang + '.html'):
             src += '.html'
@@ -193,7 +198,7 @@ def main():
     params = {}
 
     try:
-        params.update(yaml.safe_load(fread('config.yml')))
+        params.update(yaml.safe_load(fread('_config.yml')))
     except Exception:
         reply = input("Config file not found. Do you want to create an example site ? [Y/n] ")
         if reply and not reply.lower().startswith("y"):
@@ -206,11 +211,15 @@ def main():
         print()
         return
 
-    for gallery_data in (d + '/gallery-data.json' for d in ('.', 'site')):
-        if path.exists(gallery_data):
-            params.update({
-                'galleries': json.loads(fread(gallery_data))
-            })
+    if path.exists('_data/gallery-data.json'):
+        params.update({
+            'galleries': json.loads(fread('_data/gallery-data.json'))
+        })
+
+    if path.exists('_data/calendar-data.json'):
+        params.update({
+            'calendar': json.loads(fread('_data/calendar-data.json'))
+        })
 
     layout_files = glob.glob("layout*.html")
 
@@ -224,11 +233,12 @@ def main():
         for name in page_names:
             make_page(name, layout, layout_params, lang)
 
-    for f in 'assets logo.png favicon.ico style.css'.split(' '):
+    for f in 'assets logo.png favicon.ico style.css calendar.css'.split(' '):
+        dst = path.join(site_dir, f)
         if path.isdir(f):
-            shutil.copytree(f, 'site/' + f, dirs_exist_ok=True)
+            shutil.copytree(f, dst, dirs_exist_ok=True)
         elif path.exists(f):
-            shutil.copy(f, 'site/' + f)
+            shutil.copy(f, dst)
 
 
 if __name__ == '__main__':

@@ -1,13 +1,20 @@
 [project]
 name = "makesite-liquidish"
-version = "1.0.3"
+version = "1.0.4"
 description = "A 'makesite' script that can handle {% if %} and {% for %} blocks as well as {{ name }} expressions."
 readme = "README.md"
 license.text = "MIT"
-requires-python = ">= 3.10"
 urls.Source = "https://github.com/Pfiver/makesite-liquidish"
 urls.PyPi = "https://pypi.org/project/makesite-liquidish/"
 authors = [
 	{ name = "Patrick Pfeifer" }
+]
+requires-python = ">= 3.10"
+dependencies = [
+	"pyyaml",
+	"watchdog",
+	"livereload",
+]
+optional-dependencies.dev_or_whatever = [
 ]
 scripts.makesite = "makesite_liquidish.makesite:main"

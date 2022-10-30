@@ -2,7 +2,7 @@
 """"asdf"""
 
 from livereload import Server
-from makesite_liquidish import main
+from makesite_liquidish.makesite import main
 
 server = Server()
 server.watch('*.html', main)

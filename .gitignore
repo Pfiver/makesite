@@ -1,4 +1,5 @@
 /dist/
+/build/
 /makesite_liquidish.egg-info/
 /makesite_liquidish/__pycache__/
-/makesite_liquidish/example_site/site/
+/makesite_liquidish/example_site/_site/
