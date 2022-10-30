@@ -233,13 +233,6 @@ def main():
         for name in page_names:
             make_page(name, layout, layout_params, lang)
 
-    for f in 'assets logo.png favicon.ico style.css calendar.css'.split(' '):
-        dst = path.join(site_dir, f)
-        if path.isdir(f):
-            shutil.copytree(f, dst, dirs_exist_ok=True)
-        elif path.exists(f):
-            shutil.copy(f, dst)
-
 
 if __name__ == '__main__':
     main()

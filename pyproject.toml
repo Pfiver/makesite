@@ -1,6 +1,6 @@
 [project]
 name = "makesite-liquidish"
-version = "1.0.4"
+version = "1.0.5.dev"
 description = "A 'makesite' script that can handle {% if %} and {% for %} blocks as well as {{ name }} expressions."
 readme = "README.md"
 license.text = "MIT"
